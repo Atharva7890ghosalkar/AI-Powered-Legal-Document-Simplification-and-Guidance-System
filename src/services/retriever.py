@@ -40,9 +40,6 @@ STOPWORDS = {
 class LegalRetriever:
     def __init__(self) -> None:
         self.settings = get_settings()
-        model_source = self.settings.embedding_model_local_path or self.settings.embedding_model_name
-        resolved_model_source = resolve_hf_model_path(model_source)
-        self._embedding_model = SentenceTransformer(resolved_model_source)
         self._client = chromadb.PersistentClient(path=str(self.settings.vector_db_path))
         try:
             self._collection = self._client.get_collection(name=self.settings.chroma_collection)
@@ -60,6 +57,10 @@ class LegalRetriever:
                 collections[0].name,
             )
 
+        model_source = self.settings.embedding_model_local_path or self.settings.embedding_model_name
+        resolved_model_source = resolve_hf_model_path(model_source)
+        self._embedding_model = SentenceTransformer(resolved_model_source)
+
     @staticmethod
     def _prefix_text(text: str, *, is_query: bool) -> str:
         prefix = QUERY_PREFIX if is_query else DOCUMENT_PREFIX
@@ -69,6 +70,24 @@ class LegalRetriever:
     def _normalize_text(text: str) -> str:
         text = text.lower().strip()
         text = re.sub(r"\s+", " ", text)
+        return text
+
+    @staticmethod
+    def _clean_text(text: str) -> str:
+        replacements = {
+            "\u00e2\u0080\u0094": "-",
+            "\u00e2\u0080\u0093": "-",
+            "\u00e2\u0080\u0098": "'",
+            "\u00e2\u0080\u0099": "'",
+            "\u00e2\u0080\u009c": '"',
+            "\u00e2\u0080\u009d": '"',
+            "\u00e2\u0080\u00a2": "-",
+            "\u00e2\u0080\u00af": " ",
+            "\u00e2\u0082\u00b9": "Rs.",
+            "\u00c2": "",
+        }
+        for bad, good in replacements.items():
+            text = text.replace(bad, good)
         return text
 
     @staticmethod
@@ -242,7 +261,7 @@ class LegalRetriever:
             }
             chunks.append(
                 RetrievedChunk(
-                    text=item["text"],
+                    text=self._clean_text(item["text"]),
                     metadata=enriched_metadata,
                     score=item["fused_score"],
                 )

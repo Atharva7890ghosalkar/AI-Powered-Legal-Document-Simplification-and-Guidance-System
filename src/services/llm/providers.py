@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Iterator
 
 from ollama import Client
@@ -11,11 +12,49 @@ logger = logging.getLogger(__name__)
 
 class MockLLMClient(LLMClient):
     def generate(self, prompt: str) -> str:
+        clause_match = re.search(
+            r"User Clause \(if provided\):\n(?P<clause>.*?)\n\nUser Query:",
+            prompt,
+            flags=re.DOTALL,
+        )
+        context_match = re.search(
+            r"Context:\n(?P<context>.*?)\n\nUser Clause",
+            prompt,
+            flags=re.DOTALL,
+        )
+        clause_text = (clause_match.group("clause").strip() if clause_match else "") or "N/A"
+        context_text = (context_match.group("context").strip() if context_match else "")
+        has_clause = clause_text != "N/A"
+        has_context = bool(context_text)
+        context_note = (
+            "The assistant retrieved supporting Indian legal context from the local vector database and used it with the uploaded document text."
+            if has_context
+            else "Because the local Chroma legal database is not available, this explanation is based only on the uploaded document text."
+        )
+
         return (
-            "Explanation: This clause sets contractual terms that may create obligations.\n"
-            "User obligation: Review deadlines, payment terms, and compliance duties in the clause.\n"
-            "Risk factors: Check for broad liability, high penalties, or auto-renew conditions.\n"
-            "Related Indian law citation: Validate against Indian Contract Act, 1872 and dispute forums."
+            "1. Document Metadata\n"
+            "- Document Type: Legal document / agreement\n"
+            "- Document Title: Not found in provided context\n"
+            "- Parties Involved: Not found in provided context\n"
+            "- Effective Date: Not found in provided context\n"
+            "- Document Duration / Validity: Not found in provided context\n"
+            "- Governing Law / Jurisdiction: India context inferred from the assistant settings\n"
+            "- Key legal document terms: Review payment, penalty, termination, liability, and dispute clauses.\n\n"
+            "2. Background Context\n"
+            "The uploaded document appears to contain legal obligations that need to be converted into plain English. "
+            f"{context_note}\n\n"
+            "3. Legal Issues, Statutes, Arguments, and Takeaways\n"
+            "- Main issue: Identify obligations, risks, deadlines, and consequences from the document.\n"
+            "- Legal principle applied: Contract terms should be checked for enforceability, clarity, penalties, liability, and dispute resolution.\n"
+            "- Compliance implication: Confirm important dates, payment duties, default consequences, and required notices before signing or acting.\n"
+            "- Practical takeaway: Ask a lawyer to review any high-value penalty, broad indemnity, automatic renewal, or one-sided termination language.\n\n"
+            "Provided document context:\n"
+            f"{clause_text[:1200] if has_clause else 'Not found in provided context'}\n\n"
+            "Follow-up Questions\n"
+            "- Which clause creates the biggest payment or penalty exposure?\n"
+            "- Are there any important deadlines or notice periods in this document?\n"
+            "- Does the document contain termination, renewal, or dispute resolution terms?"
         )
 
     def stream_generate(self, prompt: str) -> Iterator[str]:
@@ -66,6 +105,9 @@ def get_llm_client() -> LLMClient:
     provider = settings.llm_provider.lower().strip()
 
     if provider == "ollama":
+        if settings.ollama_base_url.rstrip("/") == "https://ollama.com" and not settings.ollama_api_key:
+            logger.info("OLLAMA_API_KEY is not configured; using mock LLM provider")
+            return MockLLMClient()
         return OllamaLLMClient()
 
     logger.info("Using mock LLM provider")

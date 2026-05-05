@@ -1,9 +1,12 @@
 from collections.abc import Iterator
+import logging
 
 from src.models.schemas import CitationItem, RetrievedChunk
 from src.services.llm.providers import get_llm_client
 from src.services.retriever import get_retriever
 from src.utils.jurisdiction import detect_chunk_state, infer_state, is_central_reference
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_metadata_value(metadata: dict, keys: list[str], default: str) -> str:
@@ -16,8 +19,28 @@ def _safe_metadata_value(metadata: dict, keys: list[str], default: str) -> str:
 
 class RAGService:
     def __init__(self) -> None:
-        self.retriever = get_retriever()
+        try:
+            self.retriever = get_retriever()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Retriever unavailable; continuing without Chroma context: %s", exc)
+            self.retriever = None
         self.llm = get_llm_client()
+
+    def _retrieve_chunks(self, *, question: str, clause_text: str | None, top_k: int | None) -> list[RetrievedChunk]:
+        if self.retriever is None:
+            return []
+
+        retrieval_query = question
+        if not infer_state(question):
+            derived_state = infer_state(clause_text or "")
+            if derived_state:
+                retrieval_query = f"{question} {derived_state}"
+
+        try:
+            return self.retriever.query(retrieval_query, top_k=top_k)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Retrieval failed; answering from uploaded document only: %s", exc)
+            return []
 
     @staticmethod
     def _length_guidance(clause_text: str | None, chunks: list[RetrievedChunk]) -> str:
@@ -169,12 +192,7 @@ class RAGService:
         clause_text: str | None = None,
         top_k: int | None = None,
     ) -> tuple[str, list[RetrievedChunk], list[CitationItem]]:
-        retrieval_query = question
-        if not infer_state(question):
-            derived_state = infer_state(clause_text or "")
-            if derived_state:
-                retrieval_query = f"{question} {derived_state}"
-        chunks = self.retriever.query(retrieval_query, top_k=top_k)
+        chunks = self._retrieve_chunks(question=question, clause_text=clause_text, top_k=top_k)
         prompt = self._build_prompt(question=question, clause_text=clause_text, chunks=chunks)
         answer = self.llm.generate(prompt)
         citations = self._build_citations(chunks, question=question, clause_text=clause_text)
@@ -187,12 +205,7 @@ class RAGService:
         clause_text: str | None = None,
         top_k: int | None = None,
     ) -> tuple[Iterator[str], list[RetrievedChunk], list[CitationItem]]:
-        retrieval_query = question
-        if not infer_state(question):
-            derived_state = infer_state(clause_text or "")
-            if derived_state:
-                retrieval_query = f"{question} {derived_state}"
-        chunks = self.retriever.query(retrieval_query, top_k=top_k)
+        chunks = self._retrieve_chunks(question=question, clause_text=clause_text, top_k=top_k)
         prompt = self._build_prompt(question=question, clause_text=clause_text, chunks=chunks)
         stream = self.llm.stream_generate(prompt)
         citations = self._build_citations(chunks, question=question, clause_text=clause_text)

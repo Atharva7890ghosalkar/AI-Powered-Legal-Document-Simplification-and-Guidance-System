@@ -60,6 +60,15 @@ def _is_google_auth_configured() -> bool:
     return bool(settings.google_client_id and settings.google_client_secret and settings.google_redirect_uri)
 
 
+def _get_guest_user() -> dict:
+    return {
+        "id": "local-guest-user",
+        "email": "guest@local.dev",
+        "name": "Local Guest",
+        "picture": "",
+    }
+
+
 def _logout() -> None:
     for key in [
         "user",
@@ -91,11 +100,9 @@ if incoming_error:
     _clear_auth_query_params()
 
 if not _is_google_auth_configured():
-    st.title("Legal Guidance Assistant")
-    st.error(
-        "Google sign-in is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI in .env"
-    )
-    st.stop()
+    if not st.session_state.user:
+        st.session_state.user = _get_guest_user()
+    st.info("Google sign-in is not configured. Running in local guest mode.")
 
 if st.session_state.auth_token and not st.session_state.user:
     current_user = _fetch_current_user(st.session_state.auth_token)
@@ -337,9 +344,12 @@ with st.sidebar:
     st.subheader("Account")
     st.write(user.get("name", "User"))
     st.caption(user.get("email", ""))
-    if st.button("Sign out", use_container_width=True):
-        _logout()
-        st.rerun()
+    if _is_google_auth_configured():
+        if st.button("Sign out", use_container_width=True):
+            _logout()
+            st.rerun()
+    else:
+        st.caption("Guest mode is active for local development.")
 
     st.subheader("Chat Sessions")
     if st.button("New Chat", use_container_width=True, key="new_chat_btn"):
