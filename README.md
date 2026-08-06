@@ -76,26 +76,48 @@ docker-compose.yml
 - Tesseract OCR installed (local non-Docker runs)
   - Windows example: set `TESSERACT_CMD=C:\Program Files (x86)\Tesseract-OCR\tesseract.exe`
 
-## Local Run (uv)
-1. Install dependencies:
-```bash
-uv sync
+## Local Run
+Run these commands from the repository root.
+
+1. Create and activate a virtual environment (PowerShell example):
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+If PowerShell blocks the activation script, run:
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-2. Create/update `.env`.
-If `.env.example` is not present, copy from your current `.env` and replace secrets.
+2. Install dependencies:
+```bash
+uv sync # This installs all dependencies from pyproject.toml
+```
 
-3. Start backend:
+3. Create `.env` from the example file and fill in secrets:
+```powershell
+Copy-Item .env.example .env
+```
+
+4. Start backend:
 ```bash
 uv run python main.py
 ```
+If you are already inside the activated virtual environment, this also works:
+```bash
+python main.py
+```
 
-4. Start frontend:
+5. Start frontend in a second terminal:
 ```bash
 uv run streamlit run frontend/app.py
 ```
+Or, with the activated venv:
+```bash
+python -m streamlit run frontend/app.py
+```
 
-5. Open:
+6. Open:
 - Frontend: `http://localhost:8501`
 - Backend health: `http://localhost:8000/health`
 
@@ -250,6 +272,3 @@ Fix:
 ### `Invalid OAuth state`
 - Ensure Google OAuth callback points to backend `/auth/google/callback`.
 - Verify `FRONTEND_BASE_URL`, `BACKEND_PUBLIC_URL`, and `GOOGLE_REDIRECT_URI` are consistent.
-
-
-

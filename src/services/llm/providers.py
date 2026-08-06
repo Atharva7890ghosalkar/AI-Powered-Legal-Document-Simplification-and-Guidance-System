@@ -12,6 +12,36 @@ logger = logging.getLogger(__name__)
 
 class MockLLMClient(LLMClient):
     def generate(self, prompt: str) -> str:
+        if "The user has not uploaded a document." in prompt:
+            question_match = re.search(
+                r"User Question:\n(?P<question>.*?)\n\nTask Requirements:",
+                prompt,
+                flags=re.DOTALL,
+            )
+            question_text = (question_match.group("question").strip() if question_match else "") or "the topic"
+            return (
+                "1. Quick Answer\n"
+                f"{question_text.capitalize()} is a general legal topic, so the answer should be read as broad guidance rather than advice on a specific uploaded document.\n\n"
+                "2. Key Legal Concepts\n"
+                "- Indian laws are rules created by Parliament, state legislatures, courts, and regulators.\n"
+                "- A clause is a specific part of a contract or legal text that describes a right, duty, restriction, or remedy.\n"
+                "- Legal risk usually means financial loss, penalty exposure, compliance failure, dispute risk, or unclear obligations.\n\n"
+                "3. Common Clauses or Risks\n"
+                "- Payment clauses define who pays, how much, and by when.\n"
+                "- Penalty or damages clauses define consequences of breach or delay.\n"
+                "- Termination clauses explain how an agreement can end.\n"
+                "- Liability and indemnity clauses decide who bears loss or legal responsibility.\n"
+                "- Governing law and dispute resolution clauses decide which law applies and how disputes are handled.\n\n"
+                "4. Practical Notes\n"
+                "- Check important deadlines, payment obligations, notice periods, and penalty language carefully.\n"
+                "- Broad indemnity, unlimited liability, one-sided termination, and automatic renewal clauses often need extra attention.\n"
+                "- For a document-specific explanation, upload the legal PDF so the assistant can analyze its actual wording.\n\n"
+                "5. Follow-up Questions\n"
+                "- Do you want a simple explanation of the most important contract clauses?\n"
+                "- Should I explain legal risk in agreements with examples?\n"
+                "- Do you want the difference between penalty, liability, and indemnity clauses?\n"
+            )
+
         clause_match = re.search(
             r"User Clause \(if provided\):\n(?P<clause>.*?)\n\nUser Query:",
             prompt,

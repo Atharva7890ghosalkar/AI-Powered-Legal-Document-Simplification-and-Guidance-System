@@ -123,6 +123,11 @@ if not st.session_state.user:
     st.link_button("Sign in with Google", _build_google_auth_url(), use_container_width=True)
     st.stop()
 
+# this below line of code from if to get_guest_user() this 2 line are only for google oauth authentication is not noe work in aws deployment when it work replce this line with above commented code & comment these 2 line of code.
+# if not st.session_state.user:
+#     st.session_state.user = _get_guest_user()
+    
+    
 user = st.session_state.user
 user_id = user["id"]
 
