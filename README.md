@@ -1,3 +1,8 @@
+## Demo Video
+
+[▶️ Watch the Demo Video](https://drive.google.com/file/d/1C_6Han1Mqm7g9mubT3LFOHbYAQB16vwR/view?usp=drive_link)
+
+
 # AI-Powered Legal Document Simplification and Guidance (India)
 
 API-first, decoupled legal assistant for Indian legal documents.
